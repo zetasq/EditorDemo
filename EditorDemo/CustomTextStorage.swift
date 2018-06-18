@@ -44,11 +44,11 @@ public final class CustomTextStorage: NSTextStorage {
     fatalError("init(coder:) has not been implemented")
   }
   
+  // MARK: - NSTextStorage overrides needed
   public override var string: String {
     return backingStore.string
   }
   
-  // MARK: - NSTextStorage overrides needed
   public override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedStringKey : Any] {
     return backingStore.attributes(at:location, effectiveRange:range)
   }
@@ -77,40 +77,35 @@ public final class CustomTextStorage: NSTextStorage {
     super.processEditing()
   }
   
-  
-  
   // MARK: - Helper methods
   private func applyStyles(in searchRange: NSRange) {
-    let fontDescriptor = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .body)
-    let boldFontDescriptor = fontDescriptor.withSymbolicTraits(.traitBold)!
-    let boldFont = UIFont(descriptor: boldFontDescriptor, size: 0)
-    let normalFont = UIFont.preferredFont(forTextStyle: .body)
+
+    let normalAttributes: [NSAttributedStringKey: Any] = [.font: UIFont.preferredFont(forTextStyle: .body)]
     
-    let regex = try! NSRegularExpression(pattern: "(\\*\\w+(\\s\\w+)*\\*)", options: [])
-    let boldAttributes: [NSAttributedStringKey: Any] = [.font: boldFont]
-    let normalAttributes: [NSAttributedStringKey: Any] = [.font: normalFont]
-    
-    regex.enumerateMatches(in: backingStore.string, options: [], range: searchRange) { match, flags, stop in
-      let matchRange = match!.range(at: 1)
+    for (pattern, attributes) in replacements {
+      let regex = try! NSRegularExpression(pattern: pattern, options: [])
       
-      addAttributes(boldAttributes, range: matchRange)
-      
-      // This ensures that any text added after the closing asterisk is not rendered in bold type.
-      let maxLoc = NSMaxRange(matchRange)
-      if maxLoc + 1 < self.length {
-        addAttributes(normalAttributes, range: NSMakeRange(maxLoc, 1))
+      regex.enumerateMatches(in: backingStore.string, options: [], range: searchRange) { match, flags, stop in
+        let matchRange = match!.range(at: 1)
+        addAttributes(attributes, range: matchRange)
+        
+        // This ensures that any text added after the closing asterisk is not rendered in bold type.
+        let maxLoc = NSMaxRange(matchRange)
+        if maxLoc < self.length {
+          addAttributes(normalAttributes, range: NSMakeRange(maxLoc, 1))
+        }
       }
     }
-    
+
   }
   
   private func performReplacements(for changedRange: NSRange) {
-    let string = NSString(string: backingStore.string)
+    let string = backingStore.string as NSString
     let extendedRangeForBeginningLine = string.lineRange(for: NSRange(location: changedRange.location, length: 0))
     let extendedRangeForEndingLine = string.lineRange(for: NSRange(location: NSMaxRange(changedRange), length: 0))
     
     let totalExtendedRange = changedRange.union(extendedRangeForBeginningLine).union(extendedRangeForEndingLine)
     applyStyles(in: totalExtendedRange)
   }
-      
+  
 }
